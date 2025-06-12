@@ -7,7 +7,8 @@ import {
   Routes,
   ChatInputCommandInteraction,
   ButtonInteraction,
-  ComponentType
+  ComponentType,
+  ActivityType
 } from 'discord.js';
 import { config } from 'dotenv';
 import { DatabaseConnection } from './database/connection';
@@ -86,12 +87,15 @@ class PterodactylBot {  private client: Client;
     } catch (error) {
       Logger.error('Error deploying commands:', error);
     }
-  }
-
-  private setupEventHandlers(): void {
+  }  private setupEventHandlers(): void {
     this.client.once(Events.ClientReady, async (readyClient) => {
       Logger.info(`Bot is ready! Logged in as ${readyClient.user.tag}`);
       Logger.info(`Connected to ${readyClient.guilds.cache.size} guilds`);
+      
+      // Set bot presence after a small delay to ensure client is fully ready
+      setTimeout(async () => {
+        await this.updateBotPresence();
+      }, 1000);
     });
 
     this.client.on(Events.InteractionCreate, async (interaction) => {
@@ -237,6 +241,25 @@ class PterodactylBot {  private client: Client;
         content: '❌ There was an error while executing this command!',
         allowedMentions: { repliedUser: false }
       });
+    }
+  }
+  private async updateBotPresence(): Promise<void> {
+    if (!this.client.user) return;
+
+    try {
+      const guildCount = this.client.guilds.cache.size;
+      
+      await this.client.user.setPresence({
+        activities: [{
+          name: `Pterodactyl Panel | ${guildCount} server${guildCount !== 1 ? 's' : ''}`,
+          type: ActivityType.Playing,
+        }],
+        status: 'online',
+      });
+
+      Logger.info(`Bot presence set to "Playing Pterodactyl Panel | ${guildCount} server${guildCount !== 1 ? 's' : ''}"`);
+    } catch (error) {
+      Logger.error('Failed to update bot presence:', error);
     }
   }
 
