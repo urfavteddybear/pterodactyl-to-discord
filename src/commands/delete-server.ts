@@ -5,7 +5,9 @@ import {
   StringSelectMenuBuilder,
   ActionRowBuilder,
   ComponentType,
-  Message
+  Message,
+  ButtonBuilder,
+  ButtonStyle
 } from 'discord.js';
 import { AuthService } from '../services/auth';
 import { PterodactylService } from '../services/pterodactyl';
@@ -53,10 +55,8 @@ export async function execute(
 
         await interaction.editReply({ embeds: [embed] });
         return;
-      }
-
-      // Direct deletion with server info
-      await handleServerDeletion(interaction, server.uuid, pterodactylService, authService, server.name);
+      }      // Show confirmation before deletion
+      await showSlashConfirmation(interaction, server, pterodactylService, authService);
     } else {
       // Show server selection (only user's servers)
       await showServerSelection(interaction, context, pterodactylService, authService);
@@ -164,9 +164,21 @@ async function showServerSelection(
     
     // Get the server info for the selected UUID
     const selectedServer = servers.find(s => s.uuid === selectedServerUuid);
-    const serverName = selectedServer ? selectedServer.name : selectedServerUuid;
     
-    await handleServerDeletion(selectInteraction, selectedServerUuid, pterodactylService, authService, serverName);
+    if (!selectedServer) {
+      const errorEmbed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle('❌ Server Not Found')
+        .setDescription('Selected server could not be found.')
+        .setTimestamp();
+
+      await selectInteraction.update({ embeds: [errorEmbed], components: [] });
+      return;
+    }
+    
+    // Show confirmation for selected server
+    await selectInteraction.deferUpdate();
+    await showSlashConfirmation(interaction, selectedServer, pterodactylService, authService);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     if (errorMessage === 'Collector received no interactions before ending with reason: time') {
@@ -182,6 +194,108 @@ async function showServerSelection(
       });
     } else {
       throw error;
+    }
+  }
+}
+
+async function showSlashConfirmation(
+  interaction: ChatInputCommandInteraction,
+  server: any,
+  pterodactylService: PterodactylService,
+  authService: AuthService
+) {
+  // Confirmation embed with buttons (same as prefix command)
+  const confirmEmbed = new EmbedBuilder()
+    .setColor('Orange')
+    .setTitle('⚠️ Confirm Server Deletion')
+    .setDescription(`Are you sure you want to delete this server? **This action cannot be undone!**`)
+    .addFields(
+      { name: '🏷️ Server Name', value: server.name, inline: true },
+      { name: '📊 Status', value: server.status || 'Unknown', inline: true },
+      { name: '🔗 UUID', value: server.uuid.substring(0, 8) + '...', inline: true },
+      { name: '⚠️ Warning', value: '**All server data will be permanently lost!**', inline: false }
+    )
+    .setTimestamp();
+
+  // Create confirmation buttons with unique IDs for slash commands
+  const confirmButton = new ButtonBuilder()
+    .setCustomId(`slash_confirm_delete_${server.uuid}`)
+    .setLabel('✅ Confirm Delete')
+    .setStyle(ButtonStyle.Danger);
+
+  const cancelButton = new ButtonBuilder()
+    .setCustomId(`slash_cancel_delete_${server.uuid}`)
+    .setLabel('❌ Cancel')
+    .setStyle(ButtonStyle.Secondary);
+
+  const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmButton, cancelButton);
+
+  const response = await interaction.editReply({
+    embeds: [confirmEmbed],
+    components: [buttonRow]
+  });
+
+  // Wait for button interaction
+  try {
+    const buttonInteraction = await response.awaitMessageComponent({
+      componentType: ComponentType.Button,
+      filter: i => i.user.id === interaction.user.id,
+      time: 30000
+    });
+
+    if (buttonInteraction.customId === `slash_cancel_delete_${server.uuid}`) {
+      const cancelEmbed = new EmbedBuilder()
+        .setColor('Grey')
+        .setTitle('❌ Deletion Cancelled')
+        .setDescription('Server deletion has been cancelled.')
+        .setTimestamp();
+
+      await buttonInteraction.update({ embeds: [cancelEmbed], components: [] });
+      return;
+    }
+
+    // Proceed with deletion (confirm button clicked)
+    const deletingEmbed = new EmbedBuilder()
+      .setColor('Yellow')
+      .setTitle('⏳ Deleting Server...')
+      .setDescription(`Deleting server **${server.name}**...`)
+      .setTimestamp();
+
+    await buttonInteraction.update({ embeds: [deletingEmbed], components: [] });
+
+    // Delete the server
+    await pterodactylService.deleteServer(server.uuid);
+    
+    // Remove from database
+    (authService as any).db.removeUserServer(interaction.user.id, server.uuid);
+
+    // Success embed
+    const successEmbed = new EmbedBuilder()
+      .setColor('Green')
+      .setTitle('✅ Server Deleted Successfully')
+      .setDescription(`Server **${server.name}** has been permanently deleted.`)
+      .addFields(
+        { name: '🗑️ Deleted Server', value: server.name, inline: true },
+        { name: '🔗 UUID', value: server.uuid.substring(0, 8) + '...', inline: true }
+      )
+      .setTimestamp();
+
+    await buttonInteraction.editReply({ embeds: [successEmbed], components: [] });
+
+    Logger.info(`User ${interaction.user.tag} deleted server: ${server.name} (${server.uuid})`);
+
+  } catch (interactionError) {
+    const errorMessage = interactionError instanceof Error ? interactionError.message : 'Unknown error';
+    if (errorMessage.includes('time')) {
+      const timeoutEmbed = new EmbedBuilder()
+        .setColor('Orange')
+        .setTitle('⏰ Confirmation Timeout')
+        .setDescription('Server deletion cancelled due to timeout.')
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [timeoutEmbed], components: [] });
+    } else {
+      throw interactionError;
     }
   }
 }
@@ -245,8 +359,8 @@ export async function executePrefix(
   pterodactylService: PterodactylService
 ) {
   try {
-    // Check if user is authenticated and admin
-    const context = await authService.requireAdmin(message.author, message.member as any);
+    // Check if user is authenticated (same as slash command - users can delete their own servers)
+    const context = await authService.requireAuth(message.author, message.member as any);
     
     if (args.length === 0) {
       // Show usage information
@@ -277,34 +391,34 @@ export async function executePrefix(
         allowedMentions: { repliedUser: false }
       });
       return;
-    }
+    }    const serverIdentifier = args.join(' '); // Join in case server name has spaces
 
-    const serverIdentifier = args.join(' '); // Join in case server name has spaces
+    // Set user API key (not admin) - same as slash command
+    pterodactylService.setUserApiKey(context.user.pterodactyl_api_key);
 
-    // Set admin API key for server operations
-    pterodactylService.setAdminApiKey();
-
-    // Get all servers to find the one to delete
-    const servers = await pterodactylService.getAllServers();
+    // Get user's servers only (not all servers)
+    const servers = await pterodactylService.getUserServers();
     
-    // Find server by ID or name
+    // Find server by ID, UUID, partial UUID, or name (same logic as slash command)
     const server = servers.find((s: any) => 
       s.uuid === serverIdentifier || 
       s.id?.toString() === serverIdentifier ||
-      s.name.toLowerCase() === serverIdentifier.toLowerCase()
+      s.uuid.startsWith(serverIdentifier) || // Partial UUID match
+      s.name.toLowerCase() === serverIdentifier.toLowerCase() // Name match
     );
 
     if (!server) {
       const embed = new EmbedBuilder()
         .setColor('Red')
         .setTitle('❌ Server Not Found')
-        .setDescription(`No server found with identifier: **${serverIdentifier}**`)
+        .setDescription(`You can only delete servers that belong to you.\n\n**Your servers:**\n${servers.map(s => `• **${s.name}** (UUID: \`${s.uuid.substring(0, 8)}...\`)`).join('\n') || 'No servers found'}`)
         .addFields(
           { 
-            name: 'Search Criteria', 
-            value: 'Searched by UUID, ID, and name (case-insensitive)',
+            name: 'Searched For', 
+            value: serverIdentifier,
             inline: false 
-          }        )
+          }
+        )
         .setTimestamp();
 
       await message.reply({ 
@@ -312,90 +426,97 @@ export async function executePrefix(
         allowedMentions: { repliedUser: false }
       });
       return;
-    }
-
-    // Confirmation embed
+    }    // Confirmation embed with buttons
     const confirmEmbed = new EmbedBuilder()
       .setColor('Orange')
       .setTitle('⚠️ Confirm Server Deletion')
       .setDescription(`Are you sure you want to delete this server? **This action cannot be undone!**`)
       .addFields(
         { name: '🏷️ Server Name', value: server.name, inline: true },
-        { name: '🆔 Server ID', value: server.id.toString(), inline: true },
-        { name: '🔗 UUID', value: server.uuid, inline: false },
         { name: '📊 Status', value: server.status || 'Unknown', inline: true },
+        { name: '🔗 UUID', value: server.uuid.substring(0, 8) + '...', inline: true },
         { name: '⚠️ Warning', value: '**All server data will be permanently lost!**', inline: false }
       )
-      .setTimestamp()      .setFooter({ text: 'React with ✅ to confirm or ❌ to cancel (30 seconds)' });
+      .setTimestamp();    // Create confirmation buttons with unique IDs to avoid conflicts with global handler
+    const confirmButton = new ButtonBuilder()
+      .setCustomId(`prefix_confirm_delete_${server.uuid}`)
+      .setLabel('✅ Confirm Delete')
+      .setStyle(ButtonStyle.Danger);
+
+    const cancelButton = new ButtonBuilder()
+      .setCustomId(`prefix_cancel_delete_${server.uuid}`)
+      .setLabel('❌ Cancel')
+      .setStyle(ButtonStyle.Secondary);
+
+    const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(confirmButton, cancelButton);
 
     const confirmMessage = await message.reply({ 
       embeds: [confirmEmbed],
+      components: [buttonRow],
       allowedMentions: { repliedUser: false }
-    });
-    
-    // Add reactions
-    await confirmMessage.react('✅');
-    await confirmMessage.react('❌');
+    });    // Wait for button interaction
+    try {
+      const buttonInteraction = await confirmMessage.awaitMessageComponent({
+        componentType: ComponentType.Button,
+        filter: i => i.user.id === message.author.id,
+        time: 30000
+      });
 
-    // Wait for reaction
-    const filter = (reaction: any, user: any) => {
-      return ['✅', '❌'].includes(reaction.emoji.name) && user.id === message.author.id;
-    };
+      if (buttonInteraction.customId === `prefix_cancel_delete_${server.uuid}`) {
+        const cancelEmbed = new EmbedBuilder()
+          .setColor('Grey')
+          .setTitle('❌ Deletion Cancelled')
+          .setDescription('Server deletion has been cancelled.')
+          .setTimestamp();
 
-    const collected = await confirmMessage.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
-    
-    if (collected.size === 0) {
-      const timeoutEmbed = new EmbedBuilder()
-        .setColor('Grey')
-        .setTitle('⏰ Confirmation Timeout')
-        .setDescription('Server deletion cancelled due to no response.')
+        await buttonInteraction.update({ embeds: [cancelEmbed], components: [] });
+        return;
+      }
+
+      // Proceed with deletion (confirm button clicked)
+      const deletingEmbed = new EmbedBuilder()
+        .setColor('Yellow')
+        .setTitle('⏳ Deleting Server...')
+        .setDescription(`Deleting server **${server.name}**...`)
         .setTimestamp();
 
-      await confirmMessage.edit({ embeds: [timeoutEmbed] });
-      return;
-    }
+      await buttonInteraction.update({ embeds: [deletingEmbed], components: [] });
 
-    const reaction = collected.first();
-    
-    if (reaction?.emoji.name === '❌') {
-      const cancelEmbed = new EmbedBuilder()
-        .setColor('Grey')
-        .setTitle('❌ Deletion Cancelled')
-        .setDescription('Server deletion has been cancelled.')
+      // Delete the server (use UUID for deletion, same as slash command)
+      await pterodactylService.deleteServer(server.uuid);
+      
+      // Remove from database (same as slash command)
+      (authService as any).db.removeUserServer(message.author.id, server.uuid);
+
+      // Success embed
+      const successEmbed = new EmbedBuilder()
+        .setColor('Green')
+        .setTitle('✅ Server Deleted Successfully')
+        .setDescription(`Server **${server.name}** has been permanently deleted.`)
+        .addFields(
+          { name: '🗑️ Deleted Server', value: server.name, inline: true },
+          { name: '🔗 UUID', value: server.uuid.substring(0, 8) + '...', inline: true }
+        )
         .setTimestamp();
 
-      await confirmMessage.edit({ embeds: [cancelEmbed] });
-      return;
+      await buttonInteraction.editReply({ embeds: [successEmbed], components: [] });
+
+      Logger.info(`User ${message.author.tag} deleted server: ${server.name} (${server.uuid})`);
+
+    } catch (interactionError) {
+      const errorMessage = interactionError instanceof Error ? interactionError.message : 'Unknown error';
+      if (errorMessage.includes('time')) {
+        const timeoutEmbed = new EmbedBuilder()
+          .setColor('Orange')
+          .setTitle('⏰ Confirmation Timeout')
+          .setDescription('Server deletion cancelled due to timeout.')
+          .setTimestamp();
+
+        await confirmMessage.edit({ embeds: [timeoutEmbed], components: [] });
+      } else {
+        throw interactionError;
+      }
     }
-
-    // Proceed with deletion
-    const deletingEmbed = new EmbedBuilder()
-      .setColor('Yellow')
-      .setTitle('⏳ Deleting Server...')
-      .setDescription(`Deleting server **${server.name}**...`)
-      .setTimestamp();
-
-    await confirmMessage.edit({ embeds: [deletingEmbed] });
-
-    // Delete the server
-    await pterodactylService.deleteServer(server.id);
-
-    // Success embed
-    const successEmbed = new EmbedBuilder()
-      .setColor('Green')
-      .setTitle('✅ Server Deleted Successfully')
-      .setDescription(`Server **${server.name}** has been permanently deleted.`)
-      .addFields(
-        { name: '🏷️ Deleted Server', value: server.name, inline: true },
-        { name: '🆔 Server ID', value: server.id.toString(), inline: true },
-        { name: '🔗 UUID', value: server.uuid, inline: false }
-      )
-      .setTimestamp()
-      .setFooter({ text: 'Server and all associated data have been permanently removed.' });
-
-    await confirmMessage.edit({ embeds: [successEmbed] });
-
-    Logger.info(`User ${message.author.tag} deleted server: ${server.name} (${server.id})`);
   } catch (error) {
     if (error instanceof Error && error.message?.includes('time')) {
       // Timeout error already handled above
@@ -412,7 +533,6 @@ export async function executePrefix(
 
     await message.reply({ 
       embeds: [embed],
-      allowedMentions: { repliedUser: false }
-    });
+      allowedMentions: { repliedUser: false }    });
   }
 }

@@ -140,10 +140,12 @@ class PterodactylBot {  private client: Client;
       }
     }
   }
-
   private async handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
     try {
-      const [action, subAction, serverUuid] = interaction.customId.split('_');
+      const [action, subAction, serverUuid] = interaction.customId.split('_');      // Skip prefix and slash command buttons - they're handled by their respective commands
+      if (action === 'prefix' || action === 'slash') {
+        return;
+      }
 
       if (action === 'confirm' && subAction === 'delete') {
         await interaction.deferUpdate();

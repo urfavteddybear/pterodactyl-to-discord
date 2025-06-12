@@ -304,7 +304,8 @@ export async function executePrefix(
           { 
             name: 'Example', 
             value: '`!create-server MyServer 1024 5120 100 "My awesome server"`',
-            inline: false          }
+            inline: false 
+          }
         )
         .setTimestamp();
 
@@ -325,7 +326,8 @@ export async function executePrefix(
     if (isNaN(memory) || isNaN(disk) || isNaN(cpu)) {
       const embed = new EmbedBuilder()
         .setColor('Red')
-        .setTitle('❌ Invalid Input')        .setDescription('Memory, disk, and CPU must be valid numbers!')
+        .setTitle('❌ Invalid Input')
+        .setDescription('Memory, disk, and CPU must be valid numbers!')
         .setTimestamp();
 
       await message.reply({ 
@@ -335,13 +337,29 @@ export async function executePrefix(
       return;
     }
 
-    // Set admin API key for server creation
+    // Set admin API key to get eggs and nodes
     pterodactylService.setAdminApiKey();
 
     // Get available eggs and nodes
-    const [eggs, nodes] = await Promise.all([
-      pterodactylService.getEggs(),
-      pterodactylService.getNodes()    ]);
+    let eggs, nodes;
+    try {
+      [eggs, nodes] = await Promise.all([
+        pterodactylService.getEggs(),
+        pterodactylService.getNodes()
+      ]);
+    } catch (error) {
+      const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle('❌ Error')
+        .setDescription('Failed to fetch available server options. Please try again later.')
+        .setTimestamp();
+
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
+      return;
+    }
 
     // Filter out undefined or incomplete eggs before using them
     const validEggs = eggs.filter(
@@ -351,7 +369,8 @@ export async function executePrefix(
     if (validEggs.length === 0) {
       const embed = new EmbedBuilder()
         .setColor('Red')
-        .setTitle('❌ No Valid Server Types Available')        .setDescription('No valid server types are currently available.')
+        .setTitle('❌ No Valid Server Types Available')
+        .setDescription('No valid server types are currently available.')
         .setTimestamp();
 
       await message.reply({ 
@@ -364,23 +383,8 @@ export async function executePrefix(
     if (nodes.length === 0) {
       const embed = new EmbedBuilder()
         .setColor('Red')
-        .setTitle('❌ No Nodes Available')        .setDescription('No nodes are available for server deployment.')
-        .setTimestamp();
-
-      await message.reply({ 
-        embeds: [embed],
-        allowedMentions: { repliedUser: false }
-      });
-      return;
-    }// For prefix commands, use the first available egg and node
-    let selectedEgg = validEggs[0];
-    let selectedNode = nodes[0];
-    
-    // Additional safety check for selectedEgg
-    if (!selectedEgg || !selectedEgg.name || !selectedEgg.nest_name) {
-      const embed = new EmbedBuilder()
-        .setColor('Red')
-        .setTitle('❌ No Valid Server Type Available')        .setDescription('No valid server type could be selected for creation.')
+        .setTitle('❌ No Nodes Available')
+        .setDescription('No nodes are currently available for server deployment.')
         .setTimestamp();
 
       await message.reply({ 
@@ -389,70 +393,152 @@ export async function executePrefix(
       });
       return;
     }
-    
-    // If there are more than 4 args and the last one looks like an egg name, try to find it
-    if (args.length > 4) {
-      const possibleEggName = args[args.length - 1].toLowerCase();
-      const foundEgg = validEggs.find((egg: any) => egg.name.toLowerCase().includes(possibleEggName));
-      if (foundEgg) {
-        selectedEgg = foundEgg;
-        // Remove the egg name from description
-        const descArgs = args.slice(4, -1);
-        description = descArgs.join(' ') || undefined;
-      }
-    }
 
-    const embed = new EmbedBuilder()
-      .setColor('Yellow')
-      .setTitle('⏳ Creating Server...')
-      .setDescription('Please wait while your server is being created.')
+    // Step 1: Node Selection
+    const nodeSelectMenu = new StringSelectMenuBuilder()
+      .setCustomId('select_node')
+      .setPlaceholder('Choose a node/location')
+      .addOptions(
+        nodes.filter(node => node && (node.name || node.attributes?.name) && (node.id || node.attributes?.id)).slice(0, 25).map(node => ({
+          label: `${node.name || node.attributes?.name} (${node.location_id || node.attributes?.location_id})`,
+          description: `${(node.memory || node.attributes?.memory) - ((node.allocated_resources?.memory || node.attributes?.allocated_resources?.memory) || 0)}MB RAM available`,
+          value: (node.id || node.attributes?.id).toString(),
+        }))
+      );
+
+    const nodeRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(nodeSelectMenu);
+
+    const nodeEmbed = new EmbedBuilder()
+      .setColor('Blue')
+      .setTitle('🌍 Select Node/Location')
+      .setDescription('Please select a node where your server will be deployed:')
       .addFields(
         { name: 'Server Name', value: name, inline: true },
         { name: 'Memory', value: `${memory} MB`, inline: true },
-        { name: 'Disk Space', value: `${disk} MB`, inline: true },
-        { name: 'CPU', value: `${cpu}%`, inline: true },        { name: 'Server Type', value: `${selectedEgg.name} (${selectedEgg.nest_name})`, inline: true },
-        { name: 'Node', value: selectedNode?.name || selectedNode?.attributes?.name || 'Unknown', inline: true },
-        { name: 'Description', value: description || 'No description', inline: false }
-      )      .setTimestamp();
+        { name: 'Disk', value: `${disk} MB`, inline: true },
+        { name: 'CPU', value: `${cpu}%`, inline: true }
+      )
+      .setTimestamp();
 
-    const reply = await message.reply({ 
-      embeds: [embed],
+    const nodeResponse = await message.reply({
+      embeds: [nodeEmbed],
+      components: [nodeRow],
       allowedMentions: { repliedUser: false }
-    });    // Create the server
-    const server = await pterodactylService.createServer({
-      name,
-      memory,
-      disk,      cpu,
-      egg: selectedEgg.id,
-      location: selectedNode?.location_id || selectedNode?.attributes?.location_id || 1,
-      allocation: selectedNode?.id || selectedNode?.attributes?.id,
-      description,
-      user: context.user.pterodactyl_user_id
     });
 
-    // Add to database
-    (authService as any).db.addUserServer(message.author.id, server.uuid, server.name);
+    let selectedNodeId: number;
 
-    // Success embed
-    const successEmbed = new EmbedBuilder()
-      .setColor('Green')
-      .setTitle('✅ Server Created Successfully!')
-      .setDescription(`Your server **${name}** has been created successfully!`)
-      .addFields(
-        { name: '🏷️ Server Name', value: name, inline: true },
-        { name: '🆔 Server ID', value: server.id?.toString() || 'Unknown', inline: true },
-        { name: '🔗 UUID', value: server.uuid, inline: false },
-        { name: '💾 Memory', value: `${memory} MB`, inline: true },
-        { name: '💿 Disk Space', value: `${disk} MB`, inline: true },
-        { name: '⚡ CPU', value: `${cpu}%`, inline: true },        { name: '📦 Server Type', value: `${selectedEgg.name} (${selectedEgg.nest_name})`, inline: true },
-        { name: '🌍 Node', value: selectedNode?.name || selectedNode?.attributes?.name || 'Unknown', inline: true },
-        { name: '📝 Description', value: description || 'No description', inline: false },
-        { name: '📊 Status', value: 'Installing...', inline: true }
-      )
-      .setTimestamp()
-      .setFooter({ text: 'Server is now installing. This may take a few minutes.' });
+    try {
+      const nodeInteraction = await nodeResponse.awaitMessageComponent({
+        componentType: ComponentType.StringSelect,
+        filter: i => i.user.id === message.author.id,
+        time: 60000
+      });
 
-    await reply.edit({ embeds: [successEmbed] });    Logger.info(`User ${message.author.tag} created server: ${server.name} (${server.uuid}) on node ${selectedNode?.name || selectedNode?.attributes?.name || 'Unknown'}`);
+      await nodeInteraction.deferUpdate();
+      selectedNodeId = parseInt(nodeInteraction.values[0]);
+
+      // Step 2: Egg Selection
+      const eggSelectMenu = new StringSelectMenuBuilder()
+        .setCustomId('select_egg')
+        .setPlaceholder('Choose a server type')
+        .addOptions(
+          validEggs.slice(0, 25).map(egg => ({
+            label: `${egg.name} (${egg.nest_name})`,
+            description: egg.description?.substring(0, 80) || `From ${egg.nest_name} nest`,
+            value: egg.id.toString(),
+          }))
+        );
+
+      const eggRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(eggSelectMenu);
+
+      const eggEmbed = new EmbedBuilder()
+        .setColor('Green')
+        .setTitle('🥚 Select Server Type')
+        .setDescription('Please select a server type from the dropdown menu:')
+        .addFields(
+          { name: 'Server Name', value: name, inline: true },
+          { name: 'Memory', value: `${memory} MB`, inline: true },
+          { name: 'Disk', value: `${disk} MB`, inline: true },
+          { name: 'CPU', value: `${cpu}%`, inline: true },
+          { name: 'Node', value: nodes.find(n => (n.id || n.attributes?.id) === selectedNodeId)?.name || nodes.find(n => (n.id || n.attributes?.id) === selectedNodeId)?.attributes?.name || 'Unknown', inline: true }
+        )
+        .setTimestamp();
+
+      await nodeInteraction.editReply({
+        embeds: [eggEmbed],
+        components: [eggRow]
+      });
+
+      const eggInteraction = await nodeResponse.awaitMessageComponent({
+        componentType: ComponentType.StringSelect,
+        filter: i => i.user.id === message.author.id,
+        time: 60000
+      });
+
+      const selectedEggId = parseInt(eggInteraction.values[0]);
+      const selectedNode = nodes.find(n => (n.id || n.attributes?.id) === selectedNodeId);
+      const selectedEgg = validEggs.find(e => e.id === selectedEggId);
+
+      // Defer the interaction for server creation
+      await eggInteraction.deferUpdate();
+
+      // Create server (smart defaults handled in service)
+      const server = await pterodactylService.createServer({
+        name,
+        description,
+        memory,
+        disk,
+        cpu,
+        egg: selectedEggId,
+        location: selectedNode?.location_id || selectedNode?.attributes?.location_id || 1,
+        allocation: selectedNode?.id || selectedNode?.attributes?.id || 1,
+        user: context.user.pterodactyl_user_id
+      });
+
+      // Add to database
+      (authService as any).db.addUserServer(message.author.id, server.uuid, server.name);
+
+      const successEmbed = new EmbedBuilder()
+        .setColor('Green')
+        .setTitle('✅ Server Created Successfully')
+        .setDescription(`Your server **${server.name}** has been created!`)
+        .addFields(
+          { name: '🆔 Server ID', value: server.uuid, inline: true },
+          { name: '📊 Status', value: server.status || 'Installing', inline: true },
+          { name: '💾 Memory', value: `${server.limits.memory} MB`, inline: true },
+          { name: '💿 Disk', value: `${server.limits.disk} MB`, inline: true },
+          { name: '⚡ CPU', value: `${server.limits.cpu}%`, inline: true },
+          { name: '🌍 Node', value: selectedNode?.name || selectedNode?.attributes?.name || 'Unknown', inline: true },
+          { name: '🥚 Type', value: `${selectedEgg?.name} (${selectedEgg?.nest_name})`, inline: true }
+        )
+        .setFooter({ text: 'Server is installing. This may take a few minutes. Startup commands are auto-configured.' })
+        .setTimestamp();
+
+      await eggInteraction.editReply({
+        embeds: [successEmbed],
+        components: []
+      });
+
+      Logger.info(`User ${message.author.tag} created server: ${server.name} (${server.uuid}) on node ${selectedNode?.name || selectedNode?.attributes?.name || 'Unknown'}`);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('time')) {
+        const timeoutEmbed = new EmbedBuilder()
+          .setColor('Orange')
+          .setTitle('⏰ Selection Timeout')
+          .setDescription('Server creation cancelled due to timeout.')
+          .setTimestamp();
+
+        await nodeResponse.edit({
+          embeds: [timeoutEmbed],
+          components: []
+        });
+      } else {
+        throw error;
+      }
+    }
   } catch (error) {
     Logger.error('Error in create-server command (prefix):', error);
     
@@ -481,7 +567,8 @@ export async function executePrefix(
     const embed = new EmbedBuilder()
       .setColor('Red')
       .setTitle(title)
-      .setDescription(errorMessage)      .setTimestamp();
+      .setDescription(errorMessage)
+      .setTimestamp();
 
     await message.reply({ 
       embeds: [embed],
