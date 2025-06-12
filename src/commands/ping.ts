@@ -61,7 +61,10 @@ export async function execute(
 }
 
 export async function executePrefix(message: Message): Promise<void> {
-  const sent = await message.reply('🏓 Pinging...');
+  const sent = await message.reply({ 
+    content: '🏓 Pinging...', 
+    allowedMentions: { repliedUser: false } 
+  });
   const latency = sent.createdTimestamp - message.createdTimestamp;
   const apiLatency = Math.round(message.client.ws.ping);
   

@@ -220,7 +220,10 @@ class PterodactylBot {  private client: Client;
         .map(name => `\`${prefix}${name}\``)
         .join(', ');
 
-      await message.reply(`❌ This command is only available as a slash command. Use \`/${commandName}\` instead.\n\n**Available prefix commands:** ${availableCommands || 'None'}`);
+      await message.reply({
+        content: `❌ This command is only available as a slash command. Use \`/${commandName}\` instead.\n\n**Available prefix commands:** ${availableCommands || 'None'}`,
+        allowedMentions: { repliedUser: false }
+      });
       return;
     }
 
@@ -228,7 +231,10 @@ class PterodactylBot {  private client: Client;
       await command.executePrefix(message, args, this.authService, this.pterodactylService);
     } catch (error) {
       Logger.error(`Error executing prefix command ${commandName}:`, error);
-      await message.reply('❌ There was an error while executing this command!');
+      await message.reply({
+        content: '❌ There was an error while executing this command!',
+        allowedMentions: { repliedUser: false }
+      });
     }
   }
 

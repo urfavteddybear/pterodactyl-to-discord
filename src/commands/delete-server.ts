@@ -268,12 +268,14 @@ export async function executePrefix(
           {
             name: '⚠️ Warning',
             value: 'This action is **irreversible**! Make sure you have backups of any important data.',
-            inline: false
-          }
+            inline: false          }
         )
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
       return;
     }
 
@@ -302,11 +304,13 @@ export async function executePrefix(
             name: 'Search Criteria', 
             value: 'Searched by UUID, ID, and name (case-insensitive)',
             inline: false 
-          }
-        )
+          }        )
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
       return;
     }
 
@@ -322,10 +326,12 @@ export async function executePrefix(
         { name: '📊 Status', value: server.status || 'Unknown', inline: true },
         { name: '⚠️ Warning', value: '**All server data will be permanently lost!**', inline: false }
       )
-      .setTimestamp()
-      .setFooter({ text: 'React with ✅ to confirm or ❌ to cancel (30 seconds)' });
+      .setTimestamp()      .setFooter({ text: 'React with ✅ to confirm or ❌ to cancel (30 seconds)' });
 
-    const confirmMessage = await message.reply({ embeds: [confirmEmbed] });
+    const confirmMessage = await message.reply({ 
+      embeds: [confirmEmbed],
+      allowedMentions: { repliedUser: false }
+    });
     
     // Add reactions
     await confirmMessage.react('✅');
@@ -402,9 +408,11 @@ export async function executePrefix(
     const embed = new EmbedBuilder()
       .setColor('Red')
       .setTitle('❌ Error')
-      .setDescription(errorMessage)
-      .setTimestamp();
+      .setDescription(errorMessage)      .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    await message.reply({ 
+      embeds: [embed],
+      allowedMentions: { repliedUser: false }
+    });
   }
 }

@@ -85,11 +85,13 @@ export async function executePrefix(
           { name: 'Pterodactyl User ID', value: boundUser.pterodactyl_user_id.toString(), inline: true },
           { name: 'Bound Since', value: new Date(boundUser.bound_at).toLocaleDateString(), inline: true },
           { name: 'Available Commands', value: '`/servers` or `!servers` - Manage servers\n`/create-server` - Create new server\n`/delete-server` - Delete server (Admin only)\n`/unbind` or `!unbind` - Unbind account', inline: false }
-        )
-        .setTimestamp();
+        )        .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
-    } else {      const embed = new EmbedBuilder()
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
+    } else {const embed = new EmbedBuilder()
         .setColor('Orange')
         .setTitle('⚠️ Account Status')
         .setDescription('Your Discord account is not bound to any Pterodactyl account.')
@@ -102,12 +104,14 @@ export async function executePrefix(
           {
             name: '🔑 Getting Your API Key',
             value: '1. Go to your Pterodactyl panel\n2. Account → API Credentials\n3. Create new API key\n4. Copy and use in bind command',
-            inline: false
-          }
+            inline: false          }
         )
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
     }
 
   } catch (error) {
@@ -117,6 +121,9 @@ export async function executePrefix(
       .setDescription('An error occurred while checking your status.')
       .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    await message.reply({ 
+      embeds: [embed],
+      allowedMentions: { repliedUser: false }
+    });
   }
 }

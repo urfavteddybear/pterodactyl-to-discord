@@ -212,7 +212,10 @@ export async function executePrefix(
         )
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
       return;
     }
 
@@ -232,7 +235,10 @@ export async function executePrefix(
       }
     }
 
-    const reply = await message.reply('🔄 Binding account...');
+    const reply = await message.reply({ 
+      content: '🔄 Binding account...',
+      allowedMentions: { repliedUser: false }
+    });
 
     // Verify the API key works and get user info
     pterodactylService.setUserApiKey(apiKey);
@@ -359,6 +365,9 @@ export async function executePrefix(
       .setDescription('An error occurred while binding your account. Please try again later.')
       .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    await message.reply({ 
+      embeds: [embed],
+      allowedMentions: { repliedUser: false }
+    });
   }
 }

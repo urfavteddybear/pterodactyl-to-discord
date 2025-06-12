@@ -79,7 +79,10 @@ export async function executePrefix(
         .setDescription('Your Discord account is not currently bound to any Pterodactyl account.')
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
       return;
     }
 
@@ -98,7 +101,10 @@ export async function executePrefix(
       .setTimestamp()
       .setFooter({ text: 'React with ✅ to confirm or ❌ to cancel (30 seconds)' });
 
-    const confirmMessage = await message.reply({ embeds: [confirmEmbed] });
+    const confirmMessage = await message.reply({ 
+      embeds: [confirmEmbed],
+      allowedMentions: { repliedUser: false }
+    });
     
     // Add reactions
     await confirmMessage.react('✅');
@@ -163,6 +169,9 @@ export async function executePrefix(
       .setDescription('An error occurred while unbinding your account. Please try again later.')
       .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    await message.reply({ 
+      embeds: [embed],
+      allowedMentions: { repliedUser: false }
+    });
   }
 }

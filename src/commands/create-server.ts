@@ -304,12 +304,14 @@ export async function executePrefix(
           { 
             name: 'Example', 
             value: '`!create-server MyServer 1024 5120 100 "My awesome server"`',
-            inline: false 
-          }
+            inline: false          }
         )
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
       return;
     }
 
@@ -323,11 +325,13 @@ export async function executePrefix(
     if (isNaN(memory) || isNaN(disk) || isNaN(cpu)) {
       const embed = new EmbedBuilder()
         .setColor('Red')
-        .setTitle('❌ Invalid Input')
-        .setDescription('Memory, disk, and CPU must be valid numbers!')
+        .setTitle('❌ Invalid Input')        .setDescription('Memory, disk, and CPU must be valid numbers!')
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
       return;
     }
 
@@ -347,24 +351,28 @@ export async function executePrefix(
     if (validEggs.length === 0) {
       const embed = new EmbedBuilder()
         .setColor('Red')
-        .setTitle('❌ No Valid Server Types Available')
-        .setDescription('No valid server types are currently available.')
+        .setTitle('❌ No Valid Server Types Available')        .setDescription('No valid server types are currently available.')
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
       return;
     }
 
     if (nodes.length === 0) {
       const embed = new EmbedBuilder()
         .setColor('Red')
-        .setTitle('❌ No Nodes Available')
-        .setDescription('No nodes are available for server deployment.')
+        .setTitle('❌ No Nodes Available')        .setDescription('No nodes are available for server deployment.')
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
       return;
-    }    // For prefix commands, use the first available egg and node
+    }// For prefix commands, use the first available egg and node
     let selectedEgg = validEggs[0];
     let selectedNode = nodes[0];
     
@@ -372,11 +380,13 @@ export async function executePrefix(
     if (!selectedEgg || !selectedEgg.name || !selectedEgg.nest_name) {
       const embed = new EmbedBuilder()
         .setColor('Red')
-        .setTitle('❌ No Valid Server Type Available')
-        .setDescription('No valid server type could be selected for creation.')
+        .setTitle('❌ No Valid Server Type Available')        .setDescription('No valid server type could be selected for creation.')
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
       return;
     }
     
@@ -403,10 +413,12 @@ export async function executePrefix(
         { name: 'CPU', value: `${cpu}%`, inline: true },        { name: 'Server Type', value: `${selectedEgg.name} (${selectedEgg.nest_name})`, inline: true },
         { name: 'Node', value: selectedNode?.name || selectedNode?.attributes?.name || 'Unknown', inline: true },
         { name: 'Description', value: description || 'No description', inline: false }
-      )
-      .setTimestamp();
+      )      .setTimestamp();
 
-    const reply = await message.reply({ embeds: [embed] });    // Create the server
+    const reply = await message.reply({ 
+      embeds: [embed],
+      allowedMentions: { repliedUser: false }
+    });    // Create the server
     const server = await pterodactylService.createServer({
       name,
       memory,
@@ -469,9 +481,11 @@ export async function executePrefix(
     const embed = new EmbedBuilder()
       .setColor('Red')
       .setTitle(title)
-      .setDescription(errorMessage)
-      .setTimestamp();
+      .setDescription(errorMessage)      .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    await message.reply({ 
+      embeds: [embed],
+      allowedMentions: { repliedUser: false }
+    });
   }
 }

@@ -105,7 +105,10 @@ export async function executePrefix(
         )
         .setTimestamp();
 
-      await message.reply({ embeds: [embed] });
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
       return;
     }    // Show servers with pagination
     await showServersWithPagination(message, servers, 0);
@@ -137,7 +140,10 @@ export async function executePrefix(
       .setDescription(errorMessage)
       .setTimestamp();
 
-    await message.reply({ embeds: [embed] });
+    await message.reply({ 
+      embeds: [embed],
+      allowedMentions: { repliedUser: false }
+    });
   }
 }
 
@@ -188,9 +194,12 @@ async function showServersWithPagination(interactionOrMessage: any, servers: any
   }
   let response;
   if (interactionOrMessage.editReply) {
-    response = await interactionOrMessage.editReply({ embeds: [embed], components });
-  } else if (interactionOrMessage.reply) {
-    response = await interactionOrMessage.reply({ embeds: [embed], components });
+    response = await interactionOrMessage.editReply({ embeds: [embed], components });  } else if (interactionOrMessage.reply) {
+    response = await interactionOrMessage.reply({ 
+      embeds: [embed], 
+      components,
+      allowedMentions: { repliedUser: false }
+    });
   } else {
     return; // Invalid interaction/message type
   }
