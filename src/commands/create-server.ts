@@ -240,14 +240,34 @@ export async function execute(
         throw error;
       }
     }
-
   } catch (error) {
     Logger.error('Error in create-server command:', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'An error occurred while creating the server.';
+    let errorMessage = 'An error occurred while creating the server.';
+    let title = '❌ Error';
+    
+    // Handle specific error types with prettier messages
+    if (error instanceof Error) {
+      if (error.message.includes('bind your account first')) {
+        title = '🔗 Account Not Bound';
+        errorMessage = 'You need to bind your Discord account to your Pterodactyl account first!\n\nUse `/bind <your_api_key>` to get started.';
+      } else if (error.message.includes('Invalid API key')) {
+        title = '🔑 Invalid API Key';
+        errorMessage = 'Your API key appears to be invalid or expired. Please use `/bind` with a new API key.';
+      } else if (error.message.includes('Connection refused') || error.message.includes('ECONNREFUSED')) {
+        title = '🔌 Connection Error';
+        errorMessage = 'Unable to connect to the Pterodactyl panel. Please try again later.';
+      } else if (error.message.includes('Validation failed')) {
+        title = '⚠️ Invalid Server Configuration';
+        errorMessage = error.message;
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
     const embed = new EmbedBuilder()
       .setColor('Red')
-      .setTitle('❌ Error')
+      .setTitle(title)
       .setDescription(errorMessage)
       .setTimestamp();
 
@@ -421,14 +441,34 @@ export async function executePrefix(
       .setFooter({ text: 'Server is now installing. This may take a few minutes.' });
 
     await reply.edit({ embeds: [successEmbed] });    Logger.info(`User ${message.author.tag} created server: ${server.name} (${server.uuid}) on node ${selectedNode?.name || selectedNode?.attributes?.name || 'Unknown'}`);
-
   } catch (error) {
     Logger.error('Error in create-server command (prefix):', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'An error occurred while creating the server.';
+    let errorMessage = 'An error occurred while creating the server.';
+    let title = '❌ Error';
+    
+    // Handle specific error types with prettier messages
+    if (error instanceof Error) {
+      if (error.message.includes('bind your account first')) {
+        title = '🔗 Account Not Bound';
+        errorMessage = 'You need to bind your Discord account to your Pterodactyl account first!\n\nUse `!bind <your_api_key>` to get started.';
+      } else if (error.message.includes('Invalid API key')) {
+        title = '🔑 Invalid API Key';
+        errorMessage = 'Your API key appears to be invalid or expired. Please use `!bind` with a new API key.';
+      } else if (error.message.includes('Connection refused') || error.message.includes('ECONNREFUSED')) {
+        title = '🔌 Connection Error';
+        errorMessage = 'Unable to connect to the Pterodactyl panel. Please try again later.';
+      } else if (error.message.includes('Validation failed')) {
+        title = '⚠️ Invalid Server Configuration';
+        errorMessage = error.message;
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
     const embed = new EmbedBuilder()
       .setColor('Red')
-      .setTitle('❌ Error')
+      .setTitle(title)
       .setDescription(errorMessage)
       .setTimestamp();
 

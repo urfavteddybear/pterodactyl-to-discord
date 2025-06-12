@@ -45,21 +45,39 @@ export async function execute(
       return;
     }    // Show servers with pagination
     await showServersWithPagination(interaction, servers, 0);
-
   } catch (error) {
     Logger.error('Error in servers command:', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'An error occurred while fetching your servers.';
+    let errorMessage = 'An error occurred while fetching your servers.';
+    let title = '❌ Error';
+    
+    // Handle specific error types with prettier messages
+    if (error instanceof Error) {
+      if (error.message.includes('bind your account first')) {
+        title = '🔗 Account Not Bound';
+        errorMessage = 'You need to bind your Discord account to your Pterodactyl account first!\n\nUse `/bind <your_api_key>` to get started.';
+      } else if (error.message.includes('Invalid API key')) {
+        title = '🔑 Invalid API Key';
+        errorMessage = 'Your API key appears to be invalid or expired. Please use `/bind` with a new API key.';
+      } else if (error.message.includes('Connection refused') || error.message.includes('ECONNREFUSED')) {
+        title = '🔌 Connection Error';
+        errorMessage = 'Unable to connect to the Pterodactyl panel. Please try again later.';
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
     const embed = new EmbedBuilder()
       .setColor('Red')
-      .setTitle('❌ Error')
+      .setTitle(title)
       .setDescription(errorMessage)
       .setTimestamp();
 
     if (interaction.deferred) {
       await interaction.editReply({ embeds: [embed] });
     } else {
-      await interaction.reply({ embeds: [embed], ephemeral: true });    }
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+    }
   }
 }
 
@@ -91,14 +109,31 @@ export async function executePrefix(
       return;
     }    // Show servers with pagination
     await showServersWithPagination(message, servers, 0);
-
   } catch (error) {
     Logger.error('Error in servers command (prefix):', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'An error occurred while fetching your servers.';
+    let errorMessage = 'An error occurred while fetching your servers.';
+    let title = '❌ Error';
+    
+    // Handle specific error types with prettier messages
+    if (error instanceof Error) {
+      if (error.message.includes('bind your account first')) {
+        title = '🔗 Account Not Bound';
+        errorMessage = 'You need to bind your Discord account to your Pterodactyl account first!\n\nUse `!bind <your_api_key>` to get started.';
+      } else if (error.message.includes('Invalid API key')) {
+        title = '🔑 Invalid API Key';
+        errorMessage = 'Your API key appears to be invalid or expired. Please use `!bind` with a new API key.';
+      } else if (error.message.includes('Connection refused') || error.message.includes('ECONNREFUSED')) {
+        title = '🔌 Connection Error';
+        errorMessage = 'Unable to connect to the Pterodactyl panel. Please try again later.';
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
     const embed = new EmbedBuilder()
       .setColor('Red')
-      .setTitle('❌ Error')
+      .setTitle(title)
       .setDescription(errorMessage)
       .setTimestamp();
 

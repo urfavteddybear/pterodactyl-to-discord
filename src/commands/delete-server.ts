@@ -60,14 +60,34 @@ export async function execute(
     } else {
       // Show server selection (only user's servers)
       await showServerSelection(interaction, context, pterodactylService, authService);
-    }
-  } catch (error) {
+    }  } catch (error) {
     Logger.error('Error in delete-server command:', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'An error occurred while deleting the server.';
+    let errorMessage = 'An error occurred while deleting the server.';
+    let title = '❌ Error';
+    
+    // Handle specific error types with prettier messages
+    if (error instanceof Error) {
+      if (error.message.includes('bind your account first')) {
+        title = '🔗 Account Not Bound';
+        errorMessage = 'You need to bind your Discord account to your Pterodactyl account first!\n\nUse `/bind <your_api_key>` to get started.';
+      } else if (error.message.includes('Invalid API key')) {
+        title = '🔑 Invalid API Key';
+        errorMessage = 'Your API key appears to be invalid or expired. Please use `/bind` with a new API key.';
+      } else if (error.message.includes('Connection refused') || error.message.includes('ECONNREFUSED')) {
+        title = '🔌 Connection Error';
+        errorMessage = 'Unable to connect to the Pterodactyl panel. Please try again later.';
+      } else if (error.message.includes('not found')) {
+        title = '🔍 Server Not Found';
+        errorMessage = error.message;
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
     const embed = new EmbedBuilder()
       .setColor('Red')
-      .setTitle('❌ Error')
+      .setTitle(title)
       .setDescription(errorMessage)
       .setTimestamp();
 
