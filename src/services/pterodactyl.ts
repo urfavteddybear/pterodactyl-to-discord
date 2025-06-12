@@ -116,13 +116,11 @@ export class PterodactylService {
 
   async getNodes(): Promise<any[]> {
     try {
-      const response = await this.client.get('/nodes');
-      // Filter out undefined/incomplete nodes
+      const response = await this.client.get('/nodes');      // Filter out undefined/incomplete nodes
       const nodes = response.data.data
         .map((node: any) => node.attributes)
         .filter((node: any) => node && node.id && node.name);
       
-      console.log(`Found ${nodes.length} valid nodes`);
       return nodes;
     } catch (error) {
       console.error('Failed to fetch nodes:', error);
@@ -162,10 +160,8 @@ export class PterodactylService {
           console.warn(`Failed to fetch eggs for nest ${nest.attributes.name}:`, error);
         }
       }
-      
-      // Filter out undefined/incomplete eggs
+        // Filter out undefined/incomplete eggs
       const validEggs = allEggs.filter(egg => egg && egg.id && egg.name);
-      console.log(`Found ${validEggs.length} valid eggs from ${nests.length} nests`);
       
       return validEggs;
     } catch (error) {
@@ -181,17 +177,7 @@ export class PterodactylService {
       
       if (!selectedEgg) {
         throw new Error(`Egg with ID ${options.egg} not found`);
-      }
-
-      console.log('Selected egg details:', {
-        id: selectedEgg.id,
-        name: selectedEgg.name,
-        nest_name: selectedEgg.nest_name,
-        startup: selectedEgg.startup,
-        docker_image: selectedEgg.docker_image
-      });
-
-      // Basic server creation payload according to Pterodactyl API
+      }      // Basic server creation payload according to Pterodactyl API
       const serverData = {
         name: options.name,
         description: options.description || '',
@@ -236,11 +222,7 @@ export class PterodactylService {
             SERVER_JARFILE: 'server.jar'
           })
         }
-      };
-
-      console.log('Creating server with payload:', JSON.stringify(serverData, null, 2));
-
-      const response = await this.client.post('/servers', serverData);
+      };      const response = await this.client.post('/servers', serverData);
       return response.data.attributes;
     } catch (error: any) {
       console.error('Server creation failed:', {
@@ -365,11 +347,9 @@ export class PterodactylService {
       if (!server) {
         throw new Error(`Server with identifier ${serverIdentifier} not found`);
       }
-      
-      // Use the internal server ID for deletion (Pterodactyl admin API expects internal ID)
+        // Use the internal server ID for deletion (Pterodactyl admin API expects internal ID)
       await this.client.delete(`/servers/${server.id}`);
       
-      console.log(`Successfully deleted server: ${server.name} (ID: ${server.id}, UUID: ${server.uuid})`);
     } catch (error) {
       console.error('Server deletion error:', error);
       throw new Error(`Failed to delete server: ${error}`);
