@@ -68,7 +68,7 @@ export class PterodactylService {
     
     // Generic AIO (All-in-One) eggs - common for custom deployments
     if (eggName.includes('aio') || eggName.includes('pterodactyl')) {
-      return '{{STARTUP_CMD}}';
+      return 'bash';
     }
     
     // Fallback based on nest type
