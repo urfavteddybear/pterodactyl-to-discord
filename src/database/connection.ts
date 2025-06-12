@@ -40,13 +40,17 @@ export class DatabaseConnection {
   getBoundUser(discordId: string): any {
     const stmt = this.db.prepare('SELECT * FROM bound_users WHERE discord_id = ?');
     return stmt.get(discordId);
-  }
-
-  unbindUser(discordId: string): void {
-    const stmt1 = this.db.prepare('DELETE FROM bound_users WHERE discord_id = ?');
-    const stmt2 = this.db.prepare('DELETE FROM user_servers WHERE discord_id = ?');
-    stmt1.run(discordId);
-    stmt2.run(discordId);
+  }  unbindUser(discordId: string): void {
+    // Use a transaction to ensure both operations succeed or fail together
+    const transaction = this.db.transaction((discordId: string) => {
+      // Delete dependent records first (user_servers), then the main record (bound_users)
+      const stmt1 = this.db.prepare('DELETE FROM user_servers WHERE discord_id = ?');
+      const stmt2 = this.db.prepare('DELETE FROM bound_users WHERE discord_id = ?');
+      stmt1.run(discordId);
+      stmt2.run(discordId);
+    });
+    
+    transaction(discordId);
   }
 
   addUserServer(discordId: string, serverUuid: string, serverName: string): void {
