@@ -44,6 +44,37 @@ export async function execute(
   try {
     await interaction.deferReply({ ephemeral: true });
 
+    // Check if user is already bound
+    const isAlreadyBound = await authService.isUserBound(interaction.user.id);
+    if (isAlreadyBound) {
+      const currentUser = await authService.getBoundUser(interaction.user.id);
+      const embed = new EmbedBuilder()
+        .setColor('Orange')
+        .setTitle('⚠️ Account Already Bound')
+        .setDescription('Your Discord account is already bound to a Pterodactyl account!')
+        .addFields(
+          { 
+            name: '📋 Current Binding', 
+            value: `**User ID:** ${currentUser?.pterodactyl_user_id}\n**API Key:** \`${currentUser?.pterodactyl_api_key.substring(0, 8)}...\``, 
+            inline: false 
+          },
+          {
+            name: '🔄 To Bind a Different Account',
+            value: 'You must first unbind your current account using `/unbind`, then use `/bind` again with your new credentials.',
+            inline: false
+          },
+          {
+            name: '📊 Check Current Status',
+            value: 'Use `/status` to see your current binding information.',
+            inline: false
+          }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
     const method = interaction.options.getString('method', true);
     const apiKey = interaction.options.getString('api_key', true);
     const identifier = interaction.options.getString('identifier');
@@ -188,6 +219,39 @@ export async function executePrefix(
   pterodactylService: PterodactylService
 ) {
   try {
+    // Check if user is already bound
+    const isAlreadyBound = await authService.isUserBound(message.author.id);
+    if (isAlreadyBound) {
+      const currentUser = await authService.getBoundUser(message.author.id);
+      const embed = new EmbedBuilder()
+        .setColor('Orange')
+        .setTitle('⚠️ Account Already Bound')
+        .setDescription('Your Discord account is already bound to a Pterodactyl account!')
+        .addFields(
+          { 
+            name: '📋 Current Binding', 
+            value: `**User ID:** ${currentUser?.pterodactyl_user_id}\n**API Key:** \`${currentUser?.pterodactyl_api_key.substring(0, 8)}...\``, 
+            inline: false 
+          },
+          {
+            name: '🔄 To Bind a Different Account',
+            value: 'You must first unbind your current account using `!unbind`, then use `!bind` again with your new credentials.',
+            inline: false
+          },
+          {
+            name: '📊 Check Current Status',
+            value: 'Use `!status` to see your current binding information.',
+            inline: false
+          }
+        )
+        .setTimestamp();
+
+      await message.reply({ 
+        embeds: [embed],
+        allowedMentions: { repliedUser: false }
+      });
+      return;
+    }
     if (args.length < 1) {
       const embed = new EmbedBuilder()
         .setColor('Red')
