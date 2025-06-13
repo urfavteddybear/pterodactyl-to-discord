@@ -217,7 +217,7 @@ The bot includes comprehensive error handling for:
 
 ## License
 
-This project is licensed under the ISC License.
+This project is licensed under the MIT License.
 
 ## Support
 
