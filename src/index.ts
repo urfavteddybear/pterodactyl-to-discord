@@ -49,10 +49,15 @@ class PterodactylBot {  private client: Client;
     this.pterodactylService = new PterodactylService();
 
     this.setupEventHandlers();
-  }
-  private async loadCommands(): Promise<void> {
+  }  private async loadCommands(): Promise<void> {
     const commandsPath = path.join(__dirname, 'commands');
-    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    
+    // In production (compiled), only look for .js files
+    // In development (ts-node), look for .ts files
+    const isProduction = __filename.endsWith('.js');
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => 
+      isProduction ? file.endsWith('.js') : file.endsWith('.ts')
+    );
 
     for (const file of commandFiles) {
       const filePath = path.join(commandsPath, file);
