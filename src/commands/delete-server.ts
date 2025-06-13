@@ -45,17 +45,23 @@ export async function execute(
         s.uuid.startsWith(serverId) || // Partial UUID match
         s.name.toLowerCase() === serverId.toLowerCase() // Name match
       );
-      
-      if (!server) {
+        if (!server) {
         const embed = new EmbedBuilder()
           .setColor('Red')
-          .setTitle('❌ Access Denied')
-          .setDescription(`You can only delete servers that belong to you.\n\n**Available servers:**\n${userServers.map(s => `• **${s.name}** (UUID: \`${s.uuid.substring(0, 8)}...\`)`).join('\n') || 'No servers found'}`)
+          .setTitle('❌ Server Not Found')
+          .setDescription(`Server with identifier \`${serverId}\` was not found or doesn't belong to you.`)
+          .addFields(
+            { 
+              name: '💡 Tip', 
+              value: 'Use `/delete-server` without parameters to see your available servers.',
+              inline: false 
+            }
+          )
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
         return;
-      }      // Show confirmation before deletion
+      }// Show confirmation before deletion
       await showSlashConfirmation(interaction, server, pterodactylService, authService);
     } else {
       // Show server selection (only user's servers)
@@ -405,17 +411,15 @@ export async function executePrefix(
       s.id?.toString() === serverIdentifier ||
       s.uuid.startsWith(serverIdentifier) || // Partial UUID match
       s.name.toLowerCase() === serverIdentifier.toLowerCase() // Name match
-    );
-
-    if (!server) {
+    );    if (!server) {
       const embed = new EmbedBuilder()
         .setColor('Red')
         .setTitle('❌ Server Not Found')
-        .setDescription(`You can only delete servers that belong to you.\n\n**Your servers:**\n${servers.map(s => `• **${s.name}** (UUID: \`${s.uuid.substring(0, 8)}...\`)`).join('\n') || 'No servers found'}`)
+        .setDescription(`Server with identifier \`${serverIdentifier}\` was not found or doesn't belong to you.`)
         .addFields(
           { 
-            name: 'Searched For', 
-            value: serverIdentifier,
+            name: '💡 Tip', 
+            value: 'Use `!delete-server` without parameters to see available servers, or use `!servers` to list all your servers.',
             inline: false 
           }
         )
@@ -426,7 +430,7 @@ export async function executePrefix(
         allowedMentions: { repliedUser: false }
       });
       return;
-    }    // Confirmation embed with buttons
+    }// Confirmation embed with buttons
     const confirmEmbed = new EmbedBuilder()
       .setColor('Orange')
       .setTitle('⚠️ Confirm Server Deletion')
