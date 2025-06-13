@@ -157,30 +157,14 @@ async function showGeneralHelp(interaction: ChatInputCommandInteraction, isUserB
   
   const embed = new EmbedBuilder()
     .setColor('Blue')
-    .setTitle('🤖 Bot Help & Commands')
-    .setDescription('Here are all available commands organized by category:')
+    .setTitle('🤖 Bot Commands')
+    .setDescription('Available commands organized by category')
     .setTimestamp();
 
-  // Add account status info
-  if (isUserBound) {
-    embed.addFields({
-      name: '✅ Account Status',
-      value: `Your account is bound and ready to use! ${isAdmin ? '**[ADMIN]**' : ''}`,
-      inline: false
-    });
-  } else {
-    embed.addFields({
-      name: '⚠️ Account Status',
-      value: 'Your account is not bound. Use `/bind` to get started!',
-      inline: false
-    });
-  }
-
-  // Add categories
+  // Add categories with clean format
   for (const [category, categoryCommands] of Object.entries(categories)) {
     const commandList = categoryCommands.map(cmd => {
-      const access = getCommandAccess(cmd.name, isUserBound, isAdmin);
-      return `\`/${cmd.name}\` - ${cmd.description} ${access}`;
+      return `\`/${cmd.name}\` - ${cmd.description}`;
     }).join('\n');
     
     embed.addFields({
@@ -190,20 +174,10 @@ async function showGeneralHelp(interaction: ChatInputCommandInteraction, isUserB
     });
   }
 
-  embed.addFields(
-    {
-      name: '💡 Tips',
-      value: '• Use `/help <command>` for detailed info about a specific command\n• You can also use prefix commands with `!` (e.g., `!servers`)\n• Some commands require account binding first',
-      inline: false
-    },
-    {
-      name: '🔗 Getting Started',
-      value: isUserBound 
-        ? 'You\'re all set! Try `/servers` to see your servers.' 
-        : 'Start by using `/bind` to connect your Pterodactyl account.',
-      inline: false
-    }
-  );
+  // Simple footer
+  embed.setFooter({ 
+    text: `${commands.length} commands available` 
+  });
 
   await interaction.editReply({ embeds: [embed] });
 }
@@ -214,30 +188,14 @@ async function showGeneralHelpPrefix(message: Message, isUserBound: boolean, isA
   
   const embed = new EmbedBuilder()
     .setColor('Blue')
-    .setTitle('🤖 Bot Help & Commands')
-    .setDescription('Here are all available commands organized by category:')
+    .setTitle('🤖 Bot Commands')
+    .setDescription('Available commands organized by category')
     .setTimestamp();
 
-  // Add account status info
-  if (isUserBound) {
-    embed.addFields({
-      name: '✅ Account Status',
-      value: `Your account is bound and ready to use! ${isAdmin ? '**[ADMIN]**' : ''}`,
-      inline: false
-    });
-  } else {
-    embed.addFields({
-      name: '⚠️ Account Status',
-      value: 'Your account is not bound. Use `!bind` to get started!',
-      inline: false
-    });
-  }
-
-  // Add categories
+  // Add categories with clean format
   for (const [category, categoryCommands] of Object.entries(categories)) {
     const commandList = categoryCommands.map(cmd => {
-      const access = getCommandAccess(cmd.name, isUserBound, isAdmin);
-      return `\`!${cmd.name}\` / \`/${cmd.name}\` - ${cmd.description} ${access}`;
+      return `\`!${cmd.name}\` / \`/${cmd.name}\` - ${cmd.description}`;
     }).join('\n');
     
     embed.addFields({
@@ -247,20 +205,10 @@ async function showGeneralHelpPrefix(message: Message, isUserBound: boolean, isA
     });
   }
 
-  embed.addFields(
-    {
-      name: '💡 Tips',
-      value: '• Use `!help <command>` for detailed info about a specific command\n• You can use both prefix (`!`) and slash (`/`) commands\n• Some commands require account binding first',
-      inline: false
-    },
-    {
-      name: '🔗 Getting Started',
-      value: isUserBound 
-        ? 'You\'re all set! Try `!servers` to see your servers.' 
-        : 'Start by using `!bind <your_api_key>` to connect your Pterodactyl account.',
-      inline: false
-    }
-  );
+  // Simple footer
+  embed.setFooter({ 
+    text: `${commands.length} commands available` 
+  });
 
   await message.reply({ 
     embeds: [embed],
@@ -287,8 +235,6 @@ async function showCommandDetails(interaction: ChatInputCommandInteraction, comm
     await interaction.editReply({ embeds: [embed] });
     return;
   }
-
-  const access = getCommandAccess(command.name, isUserBound, isAdmin);
   const detailedInfo = getCommandDetailedInfo(command.name);
 
   const embed = new EmbedBuilder()
@@ -299,11 +245,6 @@ async function showCommandDetails(interaction: ChatInputCommandInteraction, comm
       {
         name: '🏷️ Category',
         value: command.category,
-        inline: true
-      },
-      {
-        name: '🔐 Access',
-        value: access,
         inline: true
       }
     );
@@ -363,8 +304,6 @@ async function showCommandDetailsPrefix(message: Message, commandName: string, i
     });
     return;
   }
-
-  const access = getCommandAccess(command.name, isUserBound, isAdmin);
   const detailedInfo = getCommandDetailedInfo(command.name);
 
   const embed = new EmbedBuilder()
@@ -375,11 +314,6 @@ async function showCommandDetailsPrefix(message: Message, commandName: string, i
       {
         name: '🏷️ Category',
         value: command.category,
-        inline: true
-      },
-      {
-        name: '🔐 Access',
-        value: access,
         inline: true
       }
     );
@@ -436,25 +370,12 @@ function groupCommandsByCategory(commands: CommandInfo[]): { [category: string]:
 function getCategoryEmoji(category: string): string {
   const emojis: { [key: string]: string } = {
     'Authentication': '🔐',
-    'Server Management': '🎮',
+    'Server Management': '🖥️',
     'Utility': '🛠️',
     'General': '📋'
   };
   
   return emojis[category] || '📋';
-}
-
-function getCommandAccess(commandName: string, isUserBound: boolean, isAdmin: boolean): string {
-  const adminCommands: string[] = []; // No admin-only commands - server ownership determines access
-  const authRequiredCommands = ['servers', 'create-server', 'delete-server', 'power', 'monitor', 'unbind', 'status'];
-  
-  if (adminCommands.includes(commandName)) {
-    return isAdmin ? '✅ Available (Admin)' : '❌ Admin Only';
-  } else if (authRequiredCommands.includes(commandName)) {
-    return isUserBound ? '✅ Available' : '❌ Requires Binding';
-  } else {
-    return '✅ Available';
-  }
 }
 
 function getCommandDetailedInfo(commandName: string): { usage?: string; notes?: string } {
@@ -470,7 +391,8 @@ function getCommandDetailedInfo(commandName: string): { usage?: string; notes?: 
     'create-server': {
       usage: '`/create-server` or `!create-server`',
       notes: 'Interactive server creation with node and egg selection. Automatically sets up smart startup commands.'
-    },    'delete-server': {
+    },
+    'delete-server': {
       usage: '`/delete-server server_id:server_name` or `!delete-server server_name`',
       notes: 'Delete servers you own. Requires confirmation before deletion. Server data will be permanently lost.'
     },
