@@ -52,22 +52,32 @@ class PterodactylBot {  private client: Client;
   }  private async loadCommands(): Promise<void> {
     const commandsPath = path.join(__dirname, 'commands');
     
-    // In production (compiled), only look for .js files
-    // In development (ts-node), look for .ts files
+    // In production (compiled), only look for .js files (not .d.ts or .js.map files)
+    // In development (ts-node), look for .ts files (not .d.ts files)
     const isProduction = __filename.endsWith('.js');
-    const commandFiles = fs.readdirSync(commandsPath).filter(file => 
-      isProduction ? file.endsWith('.js') : file.endsWith('.ts')
-    );
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => {
+      if (isProduction) {
+        // Only include .js files, exclude .d.ts and .js.map files
+        return file.endsWith('.js') && !file.includes('.d.') && !file.includes('.map');
+      } else {
+        // Only include .ts files, exclude .d.ts files
+        return file.endsWith('.ts') && !file.includes('.d.');
+      }
+    });
 
     for (const file of commandFiles) {
-      const filePath = path.join(commandsPath, file);
-      const command = await import(filePath);
-      
-      if ('data' in command && 'execute' in command) {
-        this.commands.set(command.data.name, command);
-        Logger.info(`Loaded command: ${command.data.name}`);
-      } else {
-        Logger.warn(`Command at ${filePath} is missing required "data" or "execute" property.`);
+      try {
+        const filePath = path.join(commandsPath, file);
+        const command = await import(filePath);
+        
+        if ('data' in command && 'execute' in command) {
+          this.commands.set(command.data.name, command);
+          Logger.info(`Loaded command: ${command.data.name}`);
+        } else {
+          Logger.warn(`Command at ${filePath} is missing required "data" or "execute" property.`);
+        }
+      } catch (error) {
+        Logger.error(`Failed to load command ${file}:`, error);
       }
     }
   }
@@ -154,16 +164,32 @@ class PterodactylBot {  private client: Client;
       const [action, subAction, serverUuid] = interaction.customId.split('_');      // Skip prefix and slash command buttons - they're handled by their respective commands
       if (action === 'prefix' || action === 'slash') {
         return;
-      }
-
-      if (action === 'confirm' && subAction === 'delete') {
+      }      if (action === 'confirm' && subAction === 'delete') {
         await interaction.deferUpdate();
 
-        // Check if user is authenticated and admin
-        const context = await this.authService.requireAdmin(interaction.user, interaction.member as any);
+        // Check if user is authenticated (no admin required - server ownership validated in command)
+        const context = await this.authService.requireAuth(interaction.user, interaction.member as any);
+        
+        // Set user API key to ensure they can only delete their own servers
+        this.pterodactylService.setUserApiKey(context.user.pterodactyl_api_key);
+        
+        // Verify server ownership by checking if user can access it
+        const userServers = await this.pterodactylService.getUserServers();
+        const server = userServers.find(s => s.uuid === serverUuid);
+        
+        if (!server) {
+          const embed = {
+            color: 0xff0000,
+            title: '❌ Access Denied',
+            description: `You don't have permission to delete this server.`,
+            timestamp: new Date().toISOString(),
+          };
+          await interaction.editReply({ embeds: [embed], components: [] });
+          return;
+        }
         
         // Delete the server
-        await this.pterodactylService.deleteServer(serverUuid);        // Remove from database
+        await this.pterodactylService.deleteServer(serverUuid);// Remove from database
         this.database.removeUserServer(interaction.user.id, serverUuid);
 
         const embed = {

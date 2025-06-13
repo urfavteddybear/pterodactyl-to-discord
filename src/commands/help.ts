@@ -90,31 +90,41 @@ async function getAvailableCommands(): Promise<CommandInfo[]> {
   const commandsDir = path.join(__dirname);
   
   try {
-    const files = fs.readdirSync(commandsDir);
+    const allFiles = fs.readdirSync(commandsDir);
+    
+    // Use the same filtering logic as the main bot
+    const isProduction = __filename.endsWith('.js');
+    const files = allFiles.filter(file => {
+      if (isProduction) {
+        // Only include .js files, exclude .d.ts and .js.map files
+        return file.endsWith('.js') && !file.includes('.d.') && !file.includes('.map');
+      } else {
+        // Only include .ts files, exclude .d.ts files
+        return file.endsWith('.ts') && !file.includes('.d.');
+      }
+    });
     
     for (const file of files) {
-      if (file.endsWith('.js') || file.endsWith('.ts')) {
-        const commandName = file.replace(/\.(js|ts)$/, '');
+      const commandName = file.replace(/\.(js|ts)$/, '');
+      
+      // Skip the help command itself to avoid recursion
+      if (commandName === 'help') continue;
+      
+      try {
+        // Dynamically import the command module
+        const commandModule = await import(path.join(commandsDir, file));
         
-        // Skip the help command itself to avoid recursion
-        if (commandName === 'help') continue;
-        
-        try {
-          // Dynamically import the command module
-          const commandModule = await import(path.join(commandsDir, file));
-          
-          if (commandModule.data) {
-            const commandData = commandModule.data;
-            commands.push({
-              name: commandData.name,
-              description: commandData.description,
-              options: commandData.options || [],
-              category: getCommandCategory(commandName)
-            });
-          }
-        } catch (error) {
-          Logger.error(`Failed to load command ${commandName}:`, error);
+        if (commandModule.data) {
+          const commandData = commandModule.data;
+          commands.push({
+            name: commandData.name,
+            description: commandData.description,
+            options: commandData.options || [],
+            category: getCommandCategory(commandName)
+          });
         }
+      } catch (error) {
+        Logger.error(`Failed to load command ${commandName}:`, error);
       }
     }
   } catch (error) {
@@ -435,7 +445,7 @@ function getCategoryEmoji(category: string): string {
 }
 
 function getCommandAccess(commandName: string, isUserBound: boolean, isAdmin: boolean): string {
-  const adminCommands = ['delete-server'];
+  const adminCommands: string[] = []; // No admin-only commands - server ownership determines access
   const authRequiredCommands = ['servers', 'create-server', 'delete-server', 'power', 'monitor', 'unbind', 'status'];
   
   if (adminCommands.includes(commandName)) {
@@ -460,10 +470,9 @@ function getCommandDetailedInfo(commandName: string): { usage?: string; notes?: 
     'create-server': {
       usage: '`/create-server` or `!create-server`',
       notes: 'Interactive server creation with node and egg selection. Automatically sets up smart startup commands.'
-    },
-    'delete-server': {
+    },    'delete-server': {
       usage: '`/delete-server server_id:server_name` or `!delete-server server_name`',
-      notes: 'Admin only command. Requires confirmation before deletion. Server data will be permanently lost.'
+      notes: 'Delete servers you own. Requires confirmation before deletion. Server data will be permanently lost.'
     },
     'power': {
       usage: '`/power action:start server_id:server_name` or `!power start server_name`',
