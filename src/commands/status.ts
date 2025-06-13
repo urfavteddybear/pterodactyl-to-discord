@@ -27,7 +27,7 @@ export async function execute(
         .addFields(
           { name: 'Pterodactyl User ID', value: boundUser.pterodactyl_user_id.toString(), inline: true },
           { name: 'Bound Since', value: new Date(boundUser.bound_at).toLocaleDateString(), inline: true },
-          { name: 'Available Commands', value: '`/servers` - Manage servers\n`/create-server` - Create new server\n`/delete-server` - Delete server (Admin only)\n`/unbind` - Unbind account', inline: false }
+          { name: 'Available Commands', value: '`/servers` - Manage servers\n`/create-server` - Create new server\n`/power` - Control server power\n`/monitor` - Monitor resources\n`/help` - Show all commands\n`/unbind` - Unbind account', inline: false }
         )
         .setTimestamp();
 
@@ -84,7 +84,7 @@ export async function executePrefix(
         .addFields(
           { name: 'Pterodactyl User ID', value: boundUser.pterodactyl_user_id.toString(), inline: true },
           { name: 'Bound Since', value: new Date(boundUser.bound_at).toLocaleDateString(), inline: true },
-          { name: 'Available Commands', value: '`/servers` or `!servers` - Manage servers\n`/create-server` - Create new server\n`/delete-server` - Delete server (Admin only)\n`/unbind` or `!unbind` - Unbind account', inline: false }
+          { name: 'Available Commands', value: '`/servers` or `!servers` - Manage servers\n`/create-server` - Create new server\n`/power` - Control server power\n`/monitor` - Monitor resources\n`/help` or `!help` - Show all commands\n`/unbind` or `!unbind` - Unbind account', inline: false }
         )        .setTimestamp();
 
       await message.reply({ 
