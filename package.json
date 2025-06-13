@@ -1,6 +1,6 @@
 {
   "name": "pterodactyl-panel-on-discord",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Discord bot for managing Pterodactyl Panel servers with user authentication and role-based access control",
   "main": "dist/index.js",
   "scripts": {
