@@ -418,11 +418,20 @@ export class PterodactylService {
       
       if (!server) {
         return null;
-      }
-
-      return server;
+      }      return server;
     } catch (error) {
       throw new Error(`Failed to fetch server: ${error}`);
+    }
+  }  async getServerResourceUsage(serverId: string): Promise<any> {
+    if (!this.userClient) {
+      throw new Error('User API key not set');
+    }
+
+    try {
+      const response = await this.userClient.get(`/servers/${serverId}/resources`);
+      return response.data.attributes;
+    } catch (error) {
+      throw new Error(`Failed to fetch server resources: ${error}`);
     }
   }
 }
