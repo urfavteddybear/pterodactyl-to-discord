@@ -158,12 +158,11 @@ async function showServersWithPagination(interactionOrMessage: any, servers: any
   const embed = new EmbedBuilder()
     .setColor('Blue')
     .setTitle('🎮 Your Servers')
-    .setDescription(`**Total servers:** ${servers.length} | **Page ${page + 1} of ${totalPages}**\n\n${
-      currentServers.map((server: any, index: number) => {
+    .setDescription(`**Total servers:** ${servers.length} | **Page ${page + 1} of ${totalPages}**\n\n${      currentServers.map((server: any, index: number) => {
         const statusEmoji = getStatusEmoji(server.status);
         return `**${startIndex + index + 1}.** ${statusEmoji} **${server.name}**\n` +
                `└ **Status:** ${server.status || 'Unknown'}\n` +
-               `└ **Resources:** ${server.limits?.memory || 'N/A'}MB RAM • ${server.limits?.disk || 'N/A'}MB Disk • ${server.limits?.cpu || 'N/A'}% CPU\n` +
+               `└ **Resources:** ${formatServerResources(server.limits)}\n` +
                `└ **UUID:** \`${server.uuid?.substring(0, 8) || 'N/A'}...\`\n`;
       }).join('\n')
     }`)
@@ -232,12 +231,11 @@ async function showServersWithPagination(interactionOrMessage: any, servers: any
         const newEmbed = new EmbedBuilder()
           .setColor('Blue')
           .setTitle('🎮 Your Servers')
-          .setDescription(`**Total servers:** ${servers.length} | **Page ${newPage + 1} of ${totalPages}**\n\n${
-            pageServers.map((server: any, index: number) => {
+          .setDescription(`**Total servers:** ${servers.length} | **Page ${newPage + 1} of ${totalPages}**\n\n${            pageServers.map((server: any, index: number) => {
               const statusEmoji = getStatusEmoji(server.status);
               return `**${startIndex + index + 1}.** ${statusEmoji} **${server.name}**\n` +
                      `└ **Status:** ${server.status || 'Unknown'}\n` +
-                     `└ **Resources:** ${server.limits?.memory || 'N/A'}MB RAM • ${server.limits?.disk || 'N/A'}MB Disk • ${server.limits?.cpu || 'N/A'}% CPU\n` +
+                     `└ **Resources:** ${formatServerResources(server.limits)}\n` +
                      `└ **UUID:** \`${server.uuid?.substring(0, 8) || 'N/A'}...\`\n`;
             }).join('\n')
           }`)
@@ -310,4 +308,40 @@ function getStatusEmoji(status: string): string {
     default:
       return '⚪';
   }
+}
+
+function formatServerResources(limits: any): string {
+  if (!limits) {
+    return '∞ RAM • ∞ Disk • ∞ CPU';
+  }
+
+  // Format memory
+  let memoryDisplay = '∞';
+  if (limits.memory && limits.memory > 0) {
+    if (limits.memory < 1024) {
+      memoryDisplay = `${limits.memory}MiB`;
+    } else {
+      const memoryGB = (limits.memory / 1024).toFixed(1);
+      memoryDisplay = `${memoryGB}GiB`;
+    }
+  }
+
+  // Format disk
+  let diskDisplay = '∞';
+  if (limits.disk && limits.disk > 0) {
+    if (limits.disk < 1024) {
+      diskDisplay = `${limits.disk}MiB`;
+    } else {
+      const diskGB = (limits.disk / 1024).toFixed(1);
+      diskDisplay = `${diskGB}GiB`;
+    }
+  }
+
+  // Format CPU
+  let cpuDisplay = '∞';
+  if (limits.cpu && limits.cpu > 0) {
+    cpuDisplay = `${limits.cpu}%`;
+  }
+
+  return `${memoryDisplay} RAM • ${diskDisplay} Disk • ${cpuDisplay} CPU`;
 }
