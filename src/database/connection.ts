@@ -36,11 +36,16 @@ export class DatabaseConnection {
     const stmt = this.db.prepare('INSERT OR REPLACE INTO bound_users (discord_id, pterodactyl_user_id, pterodactyl_api_key) VALUES (?, ?, ?)');
     stmt.run(discordId, pterodactylUserId, apiKey);
   }
-
   getBoundUser(discordId: string): any {
     const stmt = this.db.prepare('SELECT * FROM bound_users WHERE discord_id = ?');
     return stmt.get(discordId);
-  }  unbindUser(discordId: string): void {
+  }
+
+  // Check if a Pterodactyl user is already bound to any Discord account
+  getPterodactylUserBinding(pterodactylUserId: number): any {
+    const stmt = this.db.prepare('SELECT * FROM bound_users WHERE pterodactyl_user_id = ?');
+    return stmt.get(pterodactylUserId);
+  }unbindUser(discordId: string): void {
     // Use a transaction to ensure both operations succeed or fail together
     const transaction = this.db.transaction((discordId: string) => {
       // Delete dependent records first (user_servers), then the main record (bound_users)

@@ -168,12 +168,41 @@ export async function execute(
 
           await interaction.editReply({ embeds: [embed] });
           return;
-        }
-        pterodactylUserId = userInfo.id;
+        }        pterodactylUserId = userInfo.id;
         break;
 
       default:
         throw new Error('Invalid binding method');
+    }
+
+    // Check if this Pterodactyl account is already bound to another Discord account
+    const pterodactylBinding = await authService.isPterodactylUserBound(pterodactylUserId);
+    if (pterodactylBinding.isBound) {
+      const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle('❌ Pterodactyl Account Already Bound')
+        .setDescription('This Pterodactyl account is already bound to another Discord account!')
+        .addFields(
+          { 
+            name: '🔗 Current Binding', 
+            value: `**Pterodactyl User ID:** ${pterodactylUserId}\n**Bound to Discord ID:** \`${pterodactylBinding.discordId}\``, 
+            inline: false 
+          },
+          {
+            name: '💡 What you can do:',
+            value: '• If this is your account on another Discord, unbind it first\n• If this is not your account, you may be using the wrong API key\n• Contact an administrator if you believe this is an error',
+            inline: false
+          },
+          {
+            name: '🔑 Security Note',
+            value: 'Each Pterodactyl account can only be bound to one Discord account at a time for security purposes.',
+            inline: false
+          }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+      return;
     }
 
     // Bind the user
@@ -393,12 +422,41 @@ export async function executePrefix(
 
           await reply.edit({ content: '', embeds: [embed] });
           return;
-        }
-        pterodactylUserId = userInfo.id;
+        }        pterodactylUserId = userInfo.id;
         break;
 
       default:
         throw new Error('Invalid binding method');
+    }
+
+    // Check if this Pterodactyl account is already bound to another Discord account
+    const pterodactylBinding = await authService.isPterodactylUserBound(pterodactylUserId);
+    if (pterodactylBinding.isBound) {
+      const embed = new EmbedBuilder()
+        .setColor('Red')
+        .setTitle('❌ Pterodactyl Account Already Bound')
+        .setDescription('This Pterodactyl account is already bound to another Discord account!')
+        .addFields(
+          { 
+            name: '🔗 Current Binding', 
+            value: `**Pterodactyl User ID:** ${pterodactylUserId}\n**Bound to Discord ID:** \`${pterodactylBinding.discordId}\``, 
+            inline: false 
+          },
+          {
+            name: '💡 What you can do:',
+            value: '• If this is your account on another Discord, unbind it first\n• If this is not your account, you may be using the wrong API key\n• Contact an administrator if you believe this is an error',
+            inline: false
+          },
+          {
+            name: '🔑 Security Note',
+            value: 'Each Pterodactyl account can only be bound to one Discord account at a time for security purposes.',
+            inline: false
+          }
+        )
+        .setTimestamp();
+
+      await reply.edit({ content: '', embeds: [embed] });
+      return;
     }
 
     // Bind the user

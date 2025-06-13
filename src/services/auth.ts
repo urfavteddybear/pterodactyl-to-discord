@@ -13,9 +13,16 @@ export class AuthService {
     const user = this.db.getBoundUser(discordId);
     return !!user;
   }
-
   async getBoundUser(discordId: string): Promise<BoundUser | null> {
     return this.db.getBoundUser(discordId);
+  }
+
+  async isPterodactylUserBound(pterodactylUserId: number): Promise<{ isBound: boolean; discordId?: string }> {
+    const existingBinding = this.db.getPterodactylUserBinding(pterodactylUserId);
+    if (existingBinding) {
+      return { isBound: true, discordId: existingBinding.discord_id };
+    }
+    return { isBound: false };
   }
 
   async bindUser(discordId: string, pterodactylUserId: number, apiKey: string): Promise<void> {
