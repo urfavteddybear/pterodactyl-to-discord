@@ -2,7 +2,11 @@ import {
   SlashCommandBuilder, 
   ChatInputCommandInteraction, 
   EmbedBuilder,
-  Message
+  Message,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType
 } from 'discord.js';
 import { AuthService } from '../services/auth';
 import { Logger } from '../utils/logger';
@@ -32,20 +36,95 @@ export async function execute(
       return;
     }
 
-    // Unbind the user
-    await authService.unbindUser(interaction.user.id);
+    // Get current user info for confirmation
+    const currentUser = await authService.getBoundUser(interaction.user.id);
 
-    const embed = new EmbedBuilder()
-      .setColor('Green')
-      .setTitle('✅ Account Unbound Successfully')
-      .setDescription('Your Discord account has been successfully unbound from your Pterodactyl account.')
+    // Confirmation prompt
+    const confirmEmbed = new EmbedBuilder()
+      .setColor('Orange')
+      .setTitle('⚠️ Confirm Account Unbinding')
+      .setDescription('Are you sure you want to unbind your Discord account from your Pterodactyl account?')
       .addFields(
-        { name: 'Note', value: 'You will need to use `/bind` again to access server management features.' }
+        { 
+          name: '📋 Current Binding', 
+          value: `**User ID:** ${currentUser?.pterodactyl_user_id}\n**API Key:** \`${currentUser?.pterodactyl_api_key.substring(0, 8)}...\``, 
+          inline: false 
+        },
+        { 
+          name: '⚠️ What happens when you unbind:', 
+          value: '• You will lose access to all server management commands\n• You will need to use `/bind` again to regain access\n• Your servers will remain intact on the panel',
+          inline: false 
+        }
       )
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
-    Logger.info(`User ${interaction.user.tag} unbound their account`);
+    const confirmButton = new ButtonBuilder()
+      .setCustomId('unbind_confirm')
+      .setLabel('✅ Yes, Unbind Account')
+      .setStyle(ButtonStyle.Danger);
+
+    const cancelButton = new ButtonBuilder()
+      .setCustomId('unbind_cancel')
+      .setLabel('❌ Cancel')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(confirmButton, cancelButton);
+
+    const response = await interaction.editReply({ 
+      embeds: [confirmEmbed], 
+      components: [row] 
+    });
+
+    // Wait for button interaction
+    try {
+      const buttonInteraction = await response.awaitMessageComponent({
+        componentType: ComponentType.Button,
+        filter: i => i.user.id === interaction.user.id,
+        time: 60000
+      });
+
+      if (buttonInteraction.customId === 'unbind_cancel') {
+        const cancelEmbed = new EmbedBuilder()
+          .setColor('Grey')
+          .setTitle('❌ Unbinding Cancelled')
+          .setDescription('Account unbinding has been cancelled. Your account remains bound.')
+          .setTimestamp();
+
+        await buttonInteraction.update({ embeds: [cancelEmbed], components: [] });
+        return;
+      }
+
+      if (buttonInteraction.customId === 'unbind_confirm') {
+        // Proceed with unbinding
+        await authService.unbindUser(interaction.user.id);
+
+        const successEmbed = new EmbedBuilder()
+          .setColor('Green')
+          .setTitle('✅ Account Unbound Successfully')
+          .setDescription('Your Discord account has been successfully unbound from your Pterodactyl account.')
+          .addFields(
+            { 
+              name: 'What\'s Next?', 
+              value: 'You will need to use `/bind` again to access server management features.',
+              inline: false 
+            }
+          )
+          .setTimestamp();
+
+        await buttonInteraction.update({ embeds: [successEmbed], components: [] });
+        Logger.info(`User ${interaction.user.tag} unbound their account`);
+      }
+
+    } catch (error) {
+      const timeoutEmbed = new EmbedBuilder()
+        .setColor('Orange')
+        .setTitle('⏰ Confirmation Timeout')
+        .setDescription('Account unbinding cancelled due to timeout.')
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [timeoutEmbed], components: [] });
+    }
 
   } catch (error) {
     Logger.error('Error in unbind command:', error);
@@ -57,9 +136,10 @@ export async function execute(
       .setTimestamp();
 
     if (interaction.deferred) {
-      await interaction.editReply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed], components: [] });
     } else {
-      await interaction.reply({ embeds: [embed], ephemeral: true });    }
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+    }
   }
 }
 
@@ -86,6 +166,9 @@ export async function executePrefix(
       return;
     }
 
+    // Get current user info for confirmation
+    const currentUser = await authService.getBoundUser(message.author.id);
+
     // Confirmation prompt
     const confirmEmbed = new EmbedBuilder()
       .setColor('Orange')
@@ -93,74 +176,88 @@ export async function executePrefix(
       .setDescription('Are you sure you want to unbind your Discord account from your Pterodactyl account?')
       .addFields(
         { 
-          name: 'What happens when you unbind:', 
-          value: '• You will lose access to all server management commands\n• You will need to use `!bind` again to regain access\n• Your servers will remain intact',
+          name: '📋 Current Binding', 
+          value: `**User ID:** ${currentUser?.pterodactyl_user_id}\n**API Key:** \`${currentUser?.pterodactyl_api_key.substring(0, 8)}...\``, 
+          inline: false 
+        },
+        { 
+          name: '⚠️ What happens when you unbind:', 
+          value: '• You will lose access to all server management commands\n• You will need to use `!bind` again to regain access\n• Your servers will remain intact on the panel',
           inline: false 
         }
       )
-      .setTimestamp()
-      .setFooter({ text: 'React with ✅ to confirm or ❌ to cancel (30 seconds)' });
+      .setTimestamp();
+
+    const confirmButton = new ButtonBuilder()
+      .setCustomId('unbind_confirm_prefix')
+      .setLabel('✅ Yes, Unbind Account')
+      .setStyle(ButtonStyle.Danger);
+
+    const cancelButton = new ButtonBuilder()
+      .setCustomId('unbind_cancel_prefix')
+      .setLabel('❌ Cancel')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(confirmButton, cancelButton);
 
     const confirmMessage = await message.reply({ 
       embeds: [confirmEmbed],
+      components: [row],
       allowedMentions: { repliedUser: false }
     });
-    
-    // Add reactions
-    await confirmMessage.react('✅');
-    await confirmMessage.react('❌');
 
-    // Wait for reaction
-    const filter = (reaction: any, user: any) => {
-      return ['✅', '❌'].includes(reaction.emoji.name) && user.id === message.author.id;
-    };
+    // Wait for button interaction
+    try {
+      const buttonInteraction = await confirmMessage.awaitMessageComponent({
+        componentType: ComponentType.Button,
+        filter: i => i.user.id === message.author.id,
+        time: 60000
+      });
 
-    const collected = await confirmMessage.awaitReactions({ filter, max: 1, time: 30000, errors: ['time'] });
-    
-    if (collected.size === 0) {
+      if (buttonInteraction.customId === 'unbind_cancel_prefix') {
+        const cancelEmbed = new EmbedBuilder()
+          .setColor('Grey')
+          .setTitle('❌ Unbinding Cancelled')
+          .setDescription('Account unbinding has been cancelled. Your account remains bound.')
+          .setTimestamp();
+
+        await buttonInteraction.update({ embeds: [cancelEmbed], components: [] });
+        return;
+      }
+
+      if (buttonInteraction.customId === 'unbind_confirm_prefix') {
+        // Proceed with unbinding
+        await authService.unbindUser(message.author.id);
+
+        const successEmbed = new EmbedBuilder()
+          .setColor('Green')
+          .setTitle('✅ Account Unbound Successfully')
+          .setDescription('Your Discord account has been successfully unbound from your Pterodactyl account.')
+          .addFields(
+            { 
+              name: 'What\'s Next?', 
+              value: 'You will need to use `!bind` again to access server management features.',
+              inline: false 
+            }
+          )
+          .setTimestamp();
+
+        await buttonInteraction.update({ embeds: [successEmbed], components: [] });
+        Logger.info(`User ${message.author.tag} unbound their account`);
+      }
+
+    } catch (error) {
       const timeoutEmbed = new EmbedBuilder()
-        .setColor('Grey')
+        .setColor('Orange')
         .setTitle('⏰ Confirmation Timeout')
-        .setDescription('Account unbinding cancelled due to no response.')
+        .setDescription('Account unbinding cancelled due to timeout.')
         .setTimestamp();
 
-      await confirmMessage.edit({ embeds: [timeoutEmbed] });
-      return;
+      await confirmMessage.edit({ embeds: [timeoutEmbed], components: [] });
     }
 
-    const reaction = collected.first();
-    
-    if (reaction?.emoji.name === '❌') {
-      const cancelEmbed = new EmbedBuilder()
-        .setColor('Grey')
-        .setTitle('❌ Unbinding Cancelled')
-        .setDescription('Account unbinding has been cancelled.')
-        .setTimestamp();
-
-      await confirmMessage.edit({ embeds: [cancelEmbed] });
-      return;
-    }
-
-    // Proceed with unbinding
-    await authService.unbindUser(message.author.id);
-
-    const embed = new EmbedBuilder()
-      .setColor('Green')
-      .setTitle('✅ Account Unbound Successfully')
-      .setDescription('Your Discord account has been successfully unbound from your Pterodactyl account.')
-      .addFields(
-        { name: 'Note', value: 'You will need to use `!bind` again to access server management features.' }
-      )
-      .setTimestamp();
-
-    await confirmMessage.edit({ embeds: [embed] });
-    Logger.info(`User ${message.author.tag} unbound their account`);
   } catch (error) {
-    if (error instanceof Error && error.message?.includes('time')) {
-      // Timeout error already handled above
-      return;
-    }
-
     Logger.error('Error in unbind command (prefix):', error);
     
     const embed = new EmbedBuilder()
